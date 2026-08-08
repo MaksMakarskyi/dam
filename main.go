@@ -1,4 +1,0 @@
-package dam
-
-func main() {
-}

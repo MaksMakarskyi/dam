@@ -7,12 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/MaksMakarskyi/dam/middleware"
+	"github.com/MaksMakarskyi/dam"
+	"github.com/MaksMakarskyi/dam/keyfunc"
+	"github.com/MaksMakarskyi/dam/limiter"
 )
-
-func MockKeyFunc(r *http.Request) (string, error) {
-	return "id-123", nil
-}
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
@@ -32,35 +30,35 @@ func TestFixedWindow(t *testing.T) {
 		"all_pass": {
 			limit:     1,
 			windowLen: time.Millisecond,
-			keyFn:     MockKeyFunc,
+			keyFn:     keyfunc.Common,
 			intervals: []time.Duration{2 * time.Millisecond, 3 * time.Millisecond},
 			responses: []int{http.StatusOK, http.StatusOK, http.StatusOK},
 		},
 		"tight_intervals": {
 			limit:     1,
 			windowLen: time.Millisecond,
-			keyFn:     MockKeyFunc,
+			keyFn:     keyfunc.Common,
 			intervals: []time.Duration{time.Millisecond, time.Millisecond},
 			responses: []int{http.StatusOK, http.StatusOK, http.StatusOK},
 		},
 		"fail_between_ok": {
 			limit:     1,
 			windowLen: 2 * time.Millisecond,
-			keyFn:     MockKeyFunc,
+			keyFn:     keyfunc.Common,
 			intervals: []time.Duration{time.Millisecond, 2 * time.Millisecond},
 			responses: []int{http.StatusOK, http.StatusTooManyRequests, http.StatusOK},
 		},
 		"exceed_limit_three": {
 			limit:     3,
 			windowLen: 3 * time.Millisecond,
-			keyFn:     MockKeyFunc,
+			keyFn:     keyfunc.Common,
 			intervals: []time.Duration{time.Millisecond, time.Millisecond, time.Microsecond},
 			responses: []int{http.StatusOK, http.StatusOK, http.StatusOK, http.StatusTooManyRequests},
 		},
 		"exceed_limit_five": {
 			limit:     5,
 			windowLen: 5 * time.Millisecond,
-			keyFn:     MockKeyFunc,
+			keyFn:     keyfunc.Common,
 			intervals: []time.Duration{time.Millisecond, time.Millisecond, time.Microsecond, time.Millisecond, time.Microsecond},
 			responses: []int{http.StatusOK, http.StatusOK, http.StatusOK, http.StatusOK, http.StatusOK, http.StatusTooManyRequests},
 		},
@@ -76,11 +74,12 @@ func TestFixedWindow(t *testing.T) {
 			)
 		}
 
-		h := middleware.LimitFixedWindow(tc.limit, tc.windowLen, tc.keyFn)(http.HandlerFunc(Handler))
+		limit := limiter.NewFixedWindowLimiter(tc.limit, tc.windowLen)
+		handler := dam.LimitFunc(limit, tc.keyFn, Handler)
 		t.Run(name, func(t *testing.T) {
 			for i, expected := range tc.responses {
 				w := httptest.NewRecorder()
-				h.ServeHTTP(w, req)
+				handler(w, req)
 
 				res := w.Result()
 				defer res.Body.Close()
