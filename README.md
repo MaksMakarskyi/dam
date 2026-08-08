@@ -9,11 +9,11 @@ TODO:
     - [x] Fixed Window Counter
     - [ ] Sliding Window Log
     - [ ] Sliding Window Counter
-- [ ] Implement common key functions to limit by (might change):
+- [x] Implement common key functions to limit by (might change):
     - [x] IP address
-    - [ ] User ID
+    - [x] User ID (see JWTClaim key function)
     - [x] API key
-    - [ ] Session
+    - [x] Session (see JWTClaim key function)
     - [x] Common key (global limiter, all requests have the same key)
 - [ ] Improve the API of middleware and limiter packages to fit nicely with:
     - [ ] net/http

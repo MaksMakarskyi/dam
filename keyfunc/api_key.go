@@ -26,6 +26,10 @@ var _ KeyFunc = ApiKey
 // The key returned is the raw secret, retained as a map key inside the
 // limiter; hash it first if bearer tokens must not sit in process memory.
 func ApiKey(r *http.Request) (string, error) {
+	return getApiKey(r)
+}
+
+func getApiKey(r *http.Request) (string, error) {
 	auth := strings.TrimSpace(r.Header.Get("Authorization"))
 	if auth == "" {
 		return "", ErrNoApiKey
