@@ -12,7 +12,7 @@ type FixedWindowLimiter struct {
 	mu        sync.Mutex
 	reqLimit  int
 	windowLen time.Duration
-	counter   map[string]*FixedWindow
+	counter   map[string]*fixedWindow
 }
 
 func NewFixedWindowLimiter(
@@ -22,7 +22,7 @@ func NewFixedWindowLimiter(
 	return &FixedWindowLimiter{
 		reqLimit:  reqLimit,
 		windowLen: windowLen,
-		counter:   make(map[string]*FixedWindow),
+		counter:   make(map[string]*fixedWindow),
 	}
 }
 
@@ -33,7 +33,7 @@ func (fwl *FixedWindowLimiter) Limit(ctx context.Context, key string) (Result, e
 	now := time.Now()
 	period, ok := fwl.counter[key]
 	if !ok || !now.Before(period.end) {
-		period = &FixedWindow{
+		period = &fixedWindow{
 			end:   now.Add(fwl.windowLen),
 			count: 0,
 		}
@@ -58,7 +58,7 @@ func (fwl *FixedWindowLimiter) Limit(ctx context.Context, key string) (Result, e
 	return res, nil
 }
 
-type FixedWindow struct {
+type fixedWindow struct {
 	end   time.Time
 	count int
 }

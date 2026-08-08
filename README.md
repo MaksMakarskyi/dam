@@ -19,7 +19,6 @@ TODO:
     - [x] net/http
     - [x] Chi 
     - [ ] Gin
-    - [ ] Fiber
     - [ ] Echo
 - [ ] Write sophisticated documentation for the main components
 - [ ] Write README with tutorials
