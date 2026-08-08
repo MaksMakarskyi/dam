@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/MaksMakarskyi/dam/keyfunc"
 	"github.com/MaksMakarskyi/dam/limiter"
 )
 
@@ -22,7 +23,7 @@ const (
 	RateLimitReset     LimitHeader = "RateLimit-Reset"
 )
 
-func LimitFixedWindow(reqLimit int, windowLen time.Duration, keyFn limiter.KeyFunc) Middleware {
+func LimitFixedWindow(reqLimit int, windowLen time.Duration, keyFn keyfunc.KeyFunc) Middleware {
 	return func(next http.Handler) http.Handler {
 		fwl := limiter.NewFixedWindowLimiter(reqLimit, windowLen)
 
