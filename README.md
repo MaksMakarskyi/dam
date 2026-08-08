@@ -12,7 +12,7 @@ TODO:
 - [ ] Implement common key functions to limit by (might change):
     - [x] IP address
     - [ ] User ID
-    - [ ] API key
+    - [x] API key
     - [ ] Session
     - [x] Common key (global limiter, all requests have the same key)
 - [ ] Improve the API of middleware and limiter packages to fit nicely with:

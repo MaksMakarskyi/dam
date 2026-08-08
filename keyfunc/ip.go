@@ -2,10 +2,13 @@ package keyfunc
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
 )
+
+var ErrNoIP = errors.New("failed to retrieve the IP address")
 
 var _ KeyFunc = IP
 
@@ -25,35 +28,40 @@ var _ KeyFunc = IP
 func IP(r *http.Request) (string, error) {
 	ips := r.Header.Get("X-Forwarded-For")
 	splitIps := strings.Split(ips, ",")
-	clientIp := strings.TrimSpace(splitIps[0])
 
-	if len(clientIp) > 0 {
-		// Each proxy appends itself on the way through, so the list grows
-		// left to right and the leftmost entry is the original client:
-		//
-		//	X-Forwarded-For: <client>, <proxy1>, …, <proxyN>
-		//
-		// https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Forwarded-For
+	// Each proxy appends itself on the way through, so the list grows
+	// left to right and the leftmost entry is the original client:
+	//
+	//	X-Forwarded-For: <client>, <proxy1>, …, <proxyN>
+	//
+	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Forwarded-For
+	clientIp := strings.TrimSpace(splitIps[0])
+	if clientIp != "" {
 		netIP := net.ParseIP(clientIp)
 		if netIP != nil {
-			return netIP.String(), nil
+			ip := netIP.String()
+			return normalize(ip), nil
 		}
 	}
 
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("%w: %w", ErrNoIP, err)
 	}
 
 	netIP := net.ParseIP(ip)
 	if netIP != nil {
 		ip := netIP.String()
-		if ip == "::1" {
-			return "127.0.0.1", nil
-		}
-
-		return ip, nil
+		return normalize(ip), nil
 	}
 
-	return "", errors.New("IP not found")
+	return "", ErrNoIP
+}
+
+func normalize(ip string) string {
+	if ip == "::1" {
+		return "127.0.0.1"
+	}
+
+	return ip
 }
