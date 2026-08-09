@@ -3,11 +3,9 @@ package dam
 import (
 	"net/http"
 	"time"
-
-	"github.com/MaksMakarskyi/dam/keyfunc"
-	"github.com/MaksMakarskyi/dam/limiter"
 )
 
+// Defaults substituted for a nil limiter, as described on [LimitFunc].
 const (
 	DefaultLimit  = 10
 	DefaultWindow = time.Second
@@ -17,7 +15,7 @@ const (
 // keyFn. The returned value has the shape every net/http router composes with,
 // so it also serves as chi middleware:
 //
-//	r.Use(dam.Limit(l, keyfunc.IP))
+//	r.Use(dam.Limit(l, dam.KeyByIP))
 //
 // One limiter is one budget. Every handler the returned middleware wraps draws
 // from l, so wrapping three routes gives those three routes a shared limit;
@@ -28,7 +26,7 @@ const (
 // A nil l or keyFn is replaced as described on [LimitFunc]. The substitution
 // happens once, here, so a defaulted limiter is shared across the wrapped
 // handlers exactly like an explicit one.
-func Limit(l limiter.Limiter, keyFn keyfunc.KeyFunc) func(http.Handler) http.Handler {
+func Limit(l Limiter, keyFn KeyFunc) func(http.Handler) http.Handler {
 	l, keyFn = withDefaults(l, keyFn)
 
 	return func(h http.Handler) http.Handler {
@@ -39,7 +37,7 @@ func Limit(l limiter.Limiter, keyFn keyfunc.KeyFunc) func(http.Handler) http.Han
 // LimitHandler wraps next and returns the rate limited [http.Handler]. It is
 // the single-handler form of [Limit]; next must not be nil. A nil l or keyFn is
 // replaced as described on [LimitFunc].
-func LimitHandler(l limiter.Limiter, keyFn keyfunc.KeyFunc, next http.Handler) http.Handler {
+func LimitHandler(l Limiter, keyFn KeyFunc, next http.Handler) http.Handler {
 	return http.HandlerFunc(LimitFunc(l, keyFn, next.ServeHTTP))
 }
 
@@ -52,17 +50,17 @@ func LimitHandler(l limiter.Limiter, keyFn keyfunc.KeyFunc, next http.Handler) h
 //
 // A nil l is replaced by a fixed window of [DefaultLimit] requests per
 // [DefaultWindow], built fresh on every call, so handlers wrapped by separate
-// calls get separate budgets. A nil keyFn is replaced by [keyfunc.Common],
-// which counts every request into one bucket: that is a service-wide cap rather
-// than a per-client one, so a single busy client can exhaust it for everyone.
-// Pass [keyfunc.IP] or another key function to give clients their own budgets.
+// calls get separate budgets. A nil keyFn is replaced by [KeyGlobal], which
+// counts every request into one bucket: that is a service-wide cap rather than
+// a per-client one, so a single busy client can exhaust it for everyone. Pass
+// [KeyByIP] or another key function to give clients their own budgets.
 //
-// A key function that fails is answered with 500. [keyfunc.ApiKey] and
-// [keyfunc.JWTClaim] fail on unauthenticated requests, where 401 is the correct
+// A key function that fails is answered with 500. [KeyByAPIKey] and
+// [KeyByJWTClaim] fail on unauthenticated requests, where 401 is the correct
 // answer, so place them behind authentication middleware.
 func LimitFunc(
-	l limiter.Limiter,
-	keyFn keyfunc.KeyFunc,
+	l Limiter,
+	keyFn KeyFunc,
 	next func(w http.ResponseWriter, r *http.Request),
 ) func(w http.ResponseWriter, r *http.Request) {
 	l, keyFn = withDefaults(l, keyFn)
@@ -91,12 +89,15 @@ func LimitFunc(
 	}
 }
 
-func withDefaults(l limiter.Limiter, keyFn keyfunc.KeyFunc) (limiter.Limiter, keyfunc.KeyFunc) {
+// withDefaults substitutes the package defaults for a nil limiter or key
+// function. Callers run it once per wrap, never per request, so the limiter it
+// builds is shared by every request that reaches the wrapped handler.
+func withDefaults(l Limiter, keyFn KeyFunc) (Limiter, KeyFunc) {
 	if l == nil {
-		l = limiter.NewFixedWindowLimiter(DefaultLimit, DefaultWindow)
+		l = NewFixedWindow(DefaultLimit, DefaultWindow)
 	}
 	if keyFn == nil {
-		keyFn = keyfunc.Common
+		keyFn = KeyGlobal
 	}
 
 	return l, keyFn

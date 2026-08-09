@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/MaksMakarskyi/dam"
-	"github.com/MaksMakarskyi/dam/keyfunc"
-	"github.com/MaksMakarskyi/dam/limiter"
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -30,35 +28,35 @@ func TestFixedWindow(t *testing.T) {
 		"all_pass": {
 			limit:     1,
 			windowLen: time.Millisecond,
-			keyFn:     keyfunc.Common,
+			keyFn:     dam.KeyGlobal,
 			intervals: []time.Duration{2 * time.Millisecond, 3 * time.Millisecond},
 			responses: []int{http.StatusOK, http.StatusOK, http.StatusOK},
 		},
 		"tight_intervals": {
 			limit:     1,
 			windowLen: time.Millisecond,
-			keyFn:     keyfunc.Common,
+			keyFn:     dam.KeyGlobal,
 			intervals: []time.Duration{time.Millisecond, time.Millisecond},
 			responses: []int{http.StatusOK, http.StatusOK, http.StatusOK},
 		},
 		"fail_between_ok": {
 			limit:     1,
 			windowLen: 2 * time.Millisecond,
-			keyFn:     keyfunc.Common,
+			keyFn:     dam.KeyGlobal,
 			intervals: []time.Duration{time.Millisecond, 2 * time.Millisecond},
 			responses: []int{http.StatusOK, http.StatusTooManyRequests, http.StatusOK},
 		},
 		"exceed_limit_three": {
 			limit:     3,
 			windowLen: 3 * time.Millisecond,
-			keyFn:     keyfunc.Common,
+			keyFn:     dam.KeyGlobal,
 			intervals: []time.Duration{time.Millisecond, time.Millisecond, time.Microsecond},
 			responses: []int{http.StatusOK, http.StatusOK, http.StatusOK, http.StatusTooManyRequests},
 		},
 		"exceed_limit_five": {
 			limit:     5,
 			windowLen: 5 * time.Millisecond,
-			keyFn:     keyfunc.Common,
+			keyFn:     dam.KeyGlobal,
 			intervals: []time.Duration{time.Millisecond, time.Millisecond, time.Microsecond, time.Millisecond, time.Microsecond},
 			responses: []int{http.StatusOK, http.StatusOK, http.StatusOK, http.StatusOK, http.StatusOK, http.StatusTooManyRequests},
 		},
@@ -74,7 +72,7 @@ func TestFixedWindow(t *testing.T) {
 			)
 		}
 
-		limit := limiter.NewFixedWindowLimiter(tc.limit, tc.windowLen)
+		limit := dam.NewFixedWindow(tc.limit, tc.windowLen)
 		handler := dam.LimitFunc(limit, tc.keyFn, Handler)
 		t.Run(name, func(t *testing.T) {
 			for i, expected := range tc.responses {

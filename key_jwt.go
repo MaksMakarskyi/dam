@@ -1,4 +1,4 @@
-package keyfunc
+package dam
 
 import (
 	"encoding/base64"
@@ -11,9 +11,9 @@ import (
 
 var ErrNoJWTClaim = errors.New("failed to retrieve the JWT claim")
 
-var _ KeyFunc = JWTClaim("sub")
+var _ KeyFunc = KeyByJWTClaim("sub")
 
-// JWTClaim returns a [KeyFunc] that keys a request by a named string claim of
+// KeyByJWTClaim returns a [KeyFunc] that keys a request by a named string claim of
 // the JWT it presents, giving every distinct claim value its own budget.
 //
 // The token is taken from the Authorization header as a bearer credential and
@@ -26,14 +26,14 @@ var _ KeyFunc = JWTClaim("sub")
 // bearer token, when that token is not a well-formed JWT, or when the claim is
 // absent, empty, or not a string.
 //
-// JWTClaim verifies nothing. The signature is never checked, so the value it
+// KeyByJWTClaim verifies nothing. The signature is never checked, so the value it
 // returns is whatever the client typed into the header. A client can rotate
 // invented claim values to shed its own limit, or send another user's
 // identifier to drain that user's budget. Use it only behind middleware that
 // has already authenticated the request.
-func JWTClaim(name string) KeyFunc {
+func KeyByJWTClaim(name string) KeyFunc {
 	return func(r *http.Request) (string, error) {
-		token, err := getApiKey(r)
+		token, err := getAPIKey(r)
 		if err != nil {
 			return "", fmt.Errorf("%w %q: %w", ErrNoJWTClaim, name, err)
 		}

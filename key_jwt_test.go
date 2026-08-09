@@ -1,4 +1,4 @@
-package keyfunc
+package dam
 
 import (
 	"encoding/base64"
@@ -6,13 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 )
-
-func testJWT(payload string) string {
-	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
-	claims := base64.RawURLEncoding.EncodeToString([]byte(payload))
-
-	return header + "." + claims + ".signature"
-}
 
 func TestJWTClaim(t *testing.T) {
 	tests := map[string]struct {
@@ -41,7 +34,7 @@ func TestJWTClaim(t *testing.T) {
 				req.Header.Set("Authorization", "Bearer "+tc.token)
 			}
 
-			key, err := JWTClaim(tc.claim)(req)
+			key, err := KeyByJWTClaim(tc.claim)(req)
 
 			if tc.wantKey != key {
 				t.Errorf("(key) expected: %q, got: %q", tc.wantKey, key)
@@ -51,4 +44,11 @@ func TestJWTClaim(t *testing.T) {
 			}
 		})
 	}
+}
+
+func testJWT(payload string) string {
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
+	claims := base64.RawURLEncoding.EncodeToString([]byte(payload))
+
+	return header + "." + claims + ".signature"
 }

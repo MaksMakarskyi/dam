@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/MaksMakarskyi/dam"
-	"github.com/MaksMakarskyi/dam/keyfunc"
-	"github.com/MaksMakarskyi/dam/limiter"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -30,7 +28,7 @@ func main() {
 		// requests per second per IP address, not 50 each.
 		//
 		// chi panics if middleware is registered after routes, so Use comes first.
-		r.Use(dam.Limit(limiter.NewFixedWindowLimiter(50, time.Second), keyfunc.IP))
+		r.Use(dam.Limit(dam.NewFixedWindow(50, time.Second), dam.KeyByIP))
 
 		r.Get("/hello", SayHello)
 
@@ -38,20 +36,20 @@ func main() {
 		// nil takes the package default of dam.DefaultLimit requests per
 		// dam.DefaultWindow, here keyed by the "sub" claim of the bearer token
 		// so the budget is per authenticated user.
-		r.Get("/hi", dam.LimitFunc(nil, keyfunc.JWTClaim("sub"), SayHi))
+		r.Get("/hi", dam.LimitFunc(nil, dam.KeyByJWTClaim("sub"), SayHi))
 	})
 
 	// A third limiter caps the service as a whole. Each layer needs its own
 	// instance: reusing one would charge a single request against it twice.
-	globalLimiter := limiter.NewFixedWindowLimiter(100, time.Second)
+	globalLimiter := dam.NewFixedWindow(100, time.Second)
 
 	server := http.Server{
 		Addr: ":8080",
 		// dam.LimitHandler wraps an http.Handler, and a chi.Router is one.
-		// keyfunc.Common keys every request identically, making this a single
+		// dam.KeyGlobal keys every request identically, making this a single
 		// service-wide budget. A request to /greetings/hi passes all three
 		// limiters and needs room in each.
-		Handler: dam.LimitHandler(globalLimiter, keyfunc.Common, r),
+		Handler: dam.LimitHandler(globalLimiter, dam.KeyGlobal, r),
 	}
 
 	log.Fatal(server.ListenAndServe())

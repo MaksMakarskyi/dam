@@ -1,4 +1,4 @@
-package keyfunc
+package dam
 
 import (
 	"errors"
@@ -39,7 +39,7 @@ func TestIP(t *testing.T) {
 				req.Header.Set("X-Forwarded-For", tc.xForwardedFor)
 			}
 
-			key, err := IP(req)
+			key, err := KeyByIP(req)
 
 			if tc.wantKey != key {
 				t.Errorf("(key) expected: %q, got: %q", tc.wantKey, key)

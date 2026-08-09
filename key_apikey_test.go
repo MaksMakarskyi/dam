@@ -1,4 +1,4 @@
-package keyfunc
+package dam
 
 import (
 	"errors"
@@ -16,13 +16,13 @@ func TestApiKey(t *testing.T) {
 		"lowercase":          {header: "bearer sk_live_abc", wantKey: "sk_live_abc", wantErr: nil},
 		"uppercase":          {header: "BEARER sk_live_abc", wantKey: "sk_live_abc", wantErr: nil},
 		"surrounding_spaces": {header: "   Bearer      sk_live_abc    ", wantKey: "sk_live_abc", wantErr: nil},
-		"basic_scheme":       {header: "Basic dXNlcjpwdw==", wantKey: "", wantErr: ErrNoApiKey},
-		"digest_scheme":      {header: "Digest xyz", wantKey: "", wantErr: ErrNoApiKey},
-		"no_scheme":          {header: "sk_live_abc", wantKey: "", wantErr: ErrNoApiKey},
-		"no_key":             {header: "Bearer", wantKey: "", wantErr: ErrNoApiKey},
-		"empty_key":          {header: "Bearer    ", wantKey: "", wantErr: ErrNoApiKey},
-		"empty_header":       {header: "    ", wantKey: "", wantErr: ErrNoApiKey},
-		"no_header":          {header: "", wantKey: "", wantErr: ErrNoApiKey},
+		"basic_scheme":       {header: "Basic dXNlcjpwdw==", wantKey: "", wantErr: ErrNoAPIKey},
+		"digest_scheme":      {header: "Digest xyz", wantKey: "", wantErr: ErrNoAPIKey},
+		"no_scheme":          {header: "sk_live_abc", wantKey: "", wantErr: ErrNoAPIKey},
+		"no_key":             {header: "Bearer", wantKey: "", wantErr: ErrNoAPIKey},
+		"empty_key":          {header: "Bearer    ", wantKey: "", wantErr: ErrNoAPIKey},
+		"empty_header":       {header: "    ", wantKey: "", wantErr: ErrNoAPIKey},
+		"no_header":          {header: "", wantKey: "", wantErr: ErrNoAPIKey},
 	}
 
 	for name, tc := range tests {
@@ -33,7 +33,7 @@ func TestApiKey(t *testing.T) {
 				req.Header.Set("Authorization", tc.header)
 			}
 
-			key, err := ApiKey(req)
+			key, err := KeyByAPIKey(req)
 
 			if tc.wantKey != key {
 				t.Errorf("(key) expected: %q, got: %q", tc.wantKey, key)
