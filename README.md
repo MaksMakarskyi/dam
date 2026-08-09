@@ -21,4 +21,5 @@ TODO:
     - [ ] Gin
     - [ ] Echo
 - [ ] Write sophisticated documentation for the main components
+- [ ] Cover the main components with tests
 - [ ] Write README with tutorials
