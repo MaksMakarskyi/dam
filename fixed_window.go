@@ -26,15 +26,24 @@ type FixedWindow struct {
 	windows   map[string]*window
 }
 
-// NewFixedWindow returns a [FixedWindow] granting reqLimit
-// requests per key per windowLen.
+// NewFixedWindow returns a [FixedWindow] granting reqLimit requests per key per
+// windowLen.
 //
 // The returned limiter is one budget. Share it to pool routes under a single
 // limit, or build separate ones to keep their limits independent.
+//
+// NewFixedWindow panics if reqLimit or windowLen is not positive.
 func NewFixedWindow(
 	reqLimit int,
 	windowLen time.Duration,
 ) *FixedWindow {
+	if reqLimit <= 0 {
+		panic("dam: reqLimit must be greater than 0")
+	}
+	if windowLen <= 0 {
+		panic("dam: windowLen must be greater than 0")
+	}
+
 	return &FixedWindow{
 		reqLimit:  reqLimit,
 		windowLen: windowLen,
@@ -62,10 +71,9 @@ func (fw *FixedWindow) Limit(ctx context.Context, key string) (LimitResult, erro
 	win.count++
 
 	res := LimitResult{
-		Allowed:    win.count <= fw.reqLimit,
-		Limit:      fw.reqLimit,
-		ResetAt:    win.end,
-		RetryAfter: win.end.Sub(now),
+		Allowed: win.count <= fw.reqLimit,
+		Limit:   fw.reqLimit,
+		ResetAt: win.end,
 	}
 
 	if res.Allowed {

@@ -29,8 +29,4 @@ type LimitResult struct {
 
 	// ResetAt is when the budget returns to Limit.
 	ResetAt time.Time
-
-	// RetryAfter is how long until the budget returns, meaningful when Allowed
-	// is false.
-	RetryAfter time.Duration
 }
