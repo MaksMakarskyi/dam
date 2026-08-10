@@ -22,33 +22,26 @@ func main() {
 	r := chi.NewRouter()
 
 	r.Route("/greetings", func(r chi.Router) {
-		// dam.Limit returns func(http.Handler) http.Handler, which is exactly
-		// chi's middleware type, so no adapter is needed. One limiter is built
-		// here and shared by every route in the group: together they get 50
-		// requests per second per IP address, not 50 each.
-		//
-		// chi panics if middleware is registered after routes, so Use comes first.
+		// dam.Limit returns chi's middleware type, so no adapter is needed. The
+		// routes below share this one limiter: 50 requests per second per IP
+		// between them, not each. chi panics if Use comes after the routes.
 		r.Use(dam.Limit(dam.NewFixedWindow(50, time.Second), dam.KeyByIP))
 
 		r.Get("/hello", SayHello)
 
-		// A route may add a limiter of its own on top of the group's. Passing
-		// nil takes the package default of dam.DefaultLimit requests per
-		// dam.DefaultWindow, here keyed by the "sub" claim of the bearer token
-		// so the budget is per authenticated user.
+		// A route may stack a limiter of its own on top of the group's. nil
+		// takes the package defaults, keyed by the token's "sub" claim.
 		r.Get("/hi", dam.LimitFunc(nil, dam.KeyByJWTClaim("sub"), SayHi))
 	})
 
 	// A third limiter caps the service as a whole. Each layer needs its own
-	// instance: reusing one would charge a single request against it twice.
+	// instance; reusing one would charge a single request against it twice.
 	globalLimiter := dam.NewFixedWindow(100, time.Second)
 
 	server := http.Server{
 		Addr: ":8080",
-		// dam.LimitHandler wraps an http.Handler, and a chi.Router is one.
-		// dam.KeyGlobal keys every request identically, making this a single
-		// service-wide budget. A request to /greetings/hi passes all three
-		// limiters and needs room in each.
+		// A chi.Router is an http.Handler, and dam.KeyGlobal keys every request
+		// alike, so this is one service-wide budget over the whole router.
 		Handler: dam.LimitHandler(globalLimiter, dam.KeyGlobal, r),
 	}
 

@@ -1,20 +1,12 @@
-module github.com/MaksMakarskyi/dam/_example
+module github.com/MaksMakarskyi/dam/damgin
 
 go 1.26.1
 
 replace github.com/MaksMakarskyi/dam => ../
 
-replace github.com/MaksMakarskyi/dam/damecho => ../damecho
-
-replace github.com/MaksMakarskyi/dam/damgin => ../damgin
-
 require (
 	github.com/MaksMakarskyi/dam v0.2.0
-	github.com/MaksMakarskyi/dam/damecho v0.0.0
-	github.com/MaksMakarskyi/dam/damgin v0.0.0
 	github.com/gin-gonic/gin v1.12.0
-	github.com/go-chi/chi/v5 v5.3.1
-	github.com/labstack/echo/v5 v5.3.1
 )
 
 require (

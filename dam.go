@@ -27,7 +27,7 @@ const (
 // happens once, here, so a defaulted limiter is shared across the wrapped
 // handlers exactly like an explicit one.
 func Limit(l Limiter, keyFn KeyFunc) func(http.Handler) http.Handler {
-	l, keyFn = withDefaults(l, keyFn)
+	l, keyFn = OrDefaults(l, keyFn)
 
 	return func(h http.Handler) http.Handler {
 		return LimitHandler(l, keyFn, h)
@@ -63,7 +63,7 @@ func LimitFunc(
 	keyFn KeyFunc,
 	next func(w http.ResponseWriter, r *http.Request),
 ) func(w http.ResponseWriter, r *http.Request) {
-	l, keyFn = withDefaults(l, keyFn)
+	l, keyFn = OrDefaults(l, keyFn)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		key, err := keyFn(r)
@@ -78,9 +78,9 @@ func LimitFunc(
 			return
 		}
 
-		setHeaders(w, result)
+		SetRateLimitHeaders(w, result)
 		if !result.Allowed {
-			setLimitedHeaders(w, result)
+			SetRetryAfter(w, result)
 			w.WriteHeader(http.StatusTooManyRequests)
 			return
 		}
@@ -89,10 +89,18 @@ func LimitFunc(
 	}
 }
 
-// withDefaults substitutes the package defaults for a nil limiter or key
-// function. Callers run it once per wrap, never per request, so the limiter it
-// builds is shared by every request that reaches the wrapped handler.
-func withDefaults(l Limiter, keyFn KeyFunc) (Limiter, KeyFunc) {
+// OrDefaults returns l and keyFn unchanged, substituting the package defaults
+// for whichever of them is nil: a fresh [FixedWindow] of [DefaultLimit] per
+// [DefaultWindow] for the limiter, [KeyGlobal] for the key function.
+//
+// Run it once per wrap, never per request. A limiter it builds is shared by
+// every request reaching the wrapped handler, exactly like an explicit one;
+// calling it per request would mint a new budget each time and limit nothing.
+//
+// It is exported for adapters targeting frameworks this module does not ship,
+// so their nil handling matches the middleware here. [Limit], [LimitHandler]
+// and [LimitFunc] already call it.
+func OrDefaults(l Limiter, keyFn KeyFunc) (Limiter, KeyFunc) {
 	if l == nil {
 		l = NewFixedWindow(DefaultLimit, DefaultWindow)
 	}
