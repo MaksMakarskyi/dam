@@ -1,9 +1,16 @@
 .PHONY: test race cover fmt fmt-check vet example damecho damgin tidy check \
-	version-guard publish publish-adapters
+	standalone version-guard publish publish-adapters publish-pkg
 
 VERSION  ?=
 MODULE   := github.com/MaksMakarskyi/dam
 ADAPTERS := damecho damgin
+
+# Version of the root module the adapters require. Defaults to VERSION, which
+# is right only while the adapters release in lockstep with the core; on an
+# independent adapter release, set it explicitly:
+#
+#	make publish-adapters VERSION=v0.1.0 CORE_VERSION=v0.2.0
+CORE_VERSION ?= $(VERSION)
 
 test:
 	@go test -shuffle=on ./...
@@ -42,6 +49,20 @@ tidy:
 
 check: fmt-check vet race example damecho damgin
 
+# Builds each adapter the way a consumer sees it: no replace, so the required
+# root version has to be published and has to actually contain the API used.
+# The replace in each adapter's go.mod hides this in every other target.
+standalone:
+	@tmp=$$(mktemp -d) && \
+	for m in $(ADAPTERS); do \
+		mkdir -p $$tmp/$$m && cp $$m/*.go $$m/go.mod $$m/go.sum $$tmp/$$m/ 2>/dev/null; \
+		(cd $$tmp/$$m && go mod edit -dropreplace=$(MODULE) \
+			&& GOFLAGS=-mod=mod go build ./...) \
+			|| { rm -rf $$tmp; echo "$$m does not build against the published $(MODULE)"; exit 1; }; \
+	done; \
+	rm -rf $$tmp; \
+	echo "adapters build against the published $(MODULE)"
+
 version-guard:
 	@test -n "$(VERSION)" || { echo "usage: make $(MAKECMDGOALS) VERSION=vX.Y.Z"; exit 1; }
 	@echo "$(VERSION)" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$$' \
@@ -54,16 +75,24 @@ publish: version-guard check
 	git tag -a $(VERSION) -m "Release $(VERSION)"
 	git push origin $(VERSION)
 
-publish-adapters: version-guard
-	@git ls-remote --exit-code --tags origin refs/tags/$(VERSION) >/dev/null \
-		|| { echo "$(VERSION) is not pushed; run make publish VERSION=$(VERSION) first"; exit 1; }
+publish-adapters: version-guard check
+	@echo "$(CORE_VERSION)" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$$' \
+		|| { echo "CORE_VERSION must look like v1.2.3, got: $(CORE_VERSION)"; exit 1; }
 	@for m in $(ADAPTERS); do \
-		(cd $$m && go mod edit -require=$(MODULE)@$(VERSION) && go mod tidy) || exit 1; \
+		! git rev-parse -q --verify refs/tags/$$m/$(VERSION) >/dev/null \
+			|| { echo "tag $$m/$(VERSION) already exists"; exit 1; }; \
 	done
-	@git diff --quiet || git commit -am "Point adapters at $(VERSION)"
+	@for m in $(ADAPTERS); do \
+		(cd $$m && go mod edit -require=$(MODULE)@$(CORE_VERSION) && go mod tidy) || exit 1; \
+	done
+	@$(MAKE) standalone
+	@git diff --quiet || git commit -am "Point adapters at $(MODULE) $(CORE_VERSION)"
 	@for m in $(ADAPTERS); do \
 		git tag -a $$m/$(VERSION) -m "Release $$m $(VERSION)" || exit 1; \
 		git push origin $$m/$(VERSION) || exit 1; \
+	done
+	@for m in $(ADAPTERS); do \
+		$(MAKE) publish-pkg MODULE=$(MODULE)/$$m VERSION=$(VERSION) || exit 1; \
 	done
 
 publish-pkg:
