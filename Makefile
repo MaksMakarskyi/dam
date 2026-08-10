@@ -44,7 +44,7 @@ check: fmt-check vet race example damecho damgin
 
 version-guard:
 	@test -n "$(VERSION)" || { echo "usage: make $(MAKECMDGOALS) VERSION=vX.Y.Z"; exit 1; }
-	@echo "$(VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$$' \
+	@echo "$(VERSION)" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$$' \
 		|| { echo "VERSION must look like v1.2.3, got: $(VERSION)"; exit 1; }
 	@git diff --quiet HEAD || { echo "working tree is dirty; commit first"; exit 1; }
 
@@ -53,6 +53,8 @@ publish: version-guard check
 		|| { echo "tag $(VERSION) already exists"; exit 1; }
 	git tag -a $(VERSION) -m "Release $(VERSION)"
 	git push origin $(VERSION)
+	@GOPROXY=proxy.golang.org go list -m $(MODULE)@$(VERSION) >/dev/null \
+		|| { echo "proxy has not picked up $(VERSION) yet; retry in a moment"; exit 1; }
 
 publish-adapters: version-guard
 	@git ls-remote --exit-code --tags origin refs/tags/$(VERSION) >/dev/null \
@@ -64,4 +66,5 @@ publish-adapters: version-guard
 	@for m in $(ADAPTERS); do \
 		git tag -a $$m/$(VERSION) -m "Release $$m $(VERSION)" || exit 1; \
 		git push origin $$m/$(VERSION) || exit 1; \
+		GOPROXY=proxy.golang.org go list -m $(MODULE)/$$m@$(VERSION) >/dev/null || exit 1; \
 	done
