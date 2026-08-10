@@ -1,22 +1,43 @@
-.PHONY: test race cover fmt fmt-check vet example damecho damgin tidy check \
-	standalone version-guard publish publish-adapters publish-pkg
+.PHONY: build vet test race cover fmt fmt-check tidy check standalone \
+	version-guard publish publish-adapters publish-pkg
 
-VERSION  ?=
 MODULE   := github.com/MaksMakarskyi/dam
 ADAPTERS := damecho damgin
+LIBS     := . $(ADAPTERS)
+MODULES  := $(LIBS) _example
 
-# Version of the root module the adapters require. Defaults to VERSION, which
-# is right only while the adapters release in lockstep with the core; on an
-# independent adapter release, set it explicitly:
+# Release inputs, set on the command line:
 #
+#	make publish VERSION=v0.2.0
 #	make publish-adapters VERSION=v0.1.0 CORE_VERSION=v0.2.0
+#
+# CORE_VERSION is the root version the adapters require. It matches VERSION
+# only while the adapters release in lockstep with the core.
+VERSION      ?=
 CORE_VERSION ?= $(VERSION)
 
+# each runs a shell command once per module directory, stopping at the first
+# failure. Every nested module needs its own visit: ./... stops at a module
+# boundary, so the root never reaches the adapters or the examples.
+define each
+@for m in $(1); do \
+	(cd $$m && $(2)) || exit 1; \
+done
+endef
+
+# ---------------------------------------------------------------- development
+
+build:
+	$(call each,$(MODULES),go build ./...)
+
+vet:
+	$(call each,$(MODULES),go vet ./...)
+
 test:
-	@go test -shuffle=on ./...
+	$(call each,$(LIBS),go test -shuffle=on ./...)
 
 race:
-	@go test -race -shuffle=on -count=1 ./...
+	$(call each,$(LIBS),go test -race -shuffle=on -count=1 ./...)
 
 cover:
 	@go test -coverprofile=coverage.out ./...
@@ -29,29 +50,12 @@ fmt:
 fmt-check:
 	@test -z "$$(gofmt -l .)" || { echo "unformatted:"; gofmt -l .; exit 1; }
 
-vet:
-	@go vet ./...
-
-example:
-	@cd _example && go build ./...
-
-damecho:
-	@cd damecho && go build ./... && go vet ./... && go test ./...
-
-damgin:
-	@cd damgin && go build ./... && go vet ./... && go test ./...
-
 tidy:
-	@go mod tidy
-	@cd _example && go mod tidy
-	@cd damecho && go mod tidy
-	@cd damgin && go mod tidy
-
-check: fmt-check vet race example damecho damgin
+	$(call each,$(MODULES),go mod tidy)
 
 # Builds each adapter the way a consumer sees it: no replace, so the required
-# root version has to be published and has to actually contain the API used.
-# The replace in each adapter's go.mod hides this in every other target.
+# root version has to be published and has to contain the API the adapter uses.
+# Every other target reads the core off disk, which hides this entirely.
 standalone:
 	@tmp=$$(mktemp -d) && \
 	for m in $(ADAPTERS); do \
@@ -63,18 +67,27 @@ standalone:
 	rm -rf $$tmp; \
 	echo "adapters build against the published $(MODULE)"
 
+check: fmt-check build vet race
+
+# -------------------------------------------------------------------- release
+
 version-guard:
 	@test -n "$(VERSION)" || { echo "usage: make $(MAKECMDGOALS) VERSION=vX.Y.Z"; exit 1; }
 	@echo "$(VERSION)" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$$' \
 		|| { echo "VERSION must look like v1.2.3, got: $(VERSION)"; exit 1; }
 	@git diff --quiet HEAD || { echo "working tree is dirty; commit first"; exit 1; }
 
+# Tags and publishes the root module. Run before publish-adapters: the adapters
+# require the root at CORE_VERSION, which has to exist first.
 publish: version-guard check
 	@! git rev-parse -q --verify refs/tags/$(VERSION) >/dev/null \
 		|| { echo "tag $(VERSION) already exists"; exit 1; }
 	git tag -a $(VERSION) -m "Release $(VERSION)"
 	git push origin $(VERSION)
+	@$(MAKE) publish-pkg MODULE=$(MODULE) VERSION=$(VERSION)
 
+# Points the adapters at the published root, then tags each under its own path
+# prefix, which is how a nested module is versioned.
 publish-adapters: version-guard check
 	@echo "$(CORE_VERSION)" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$$' \
 		|| { echo "CORE_VERSION must look like v1.2.3, got: $(CORE_VERSION)"; exit 1; }
@@ -82,9 +95,7 @@ publish-adapters: version-guard check
 		! git rev-parse -q --verify refs/tags/$$m/$(VERSION) >/dev/null \
 			|| { echo "tag $$m/$(VERSION) already exists"; exit 1; }; \
 	done
-	@for m in $(ADAPTERS); do \
-		(cd $$m && go mod edit -require=$(MODULE)@$(CORE_VERSION) && go mod tidy) || exit 1; \
-	done
+	$(call each,$(ADAPTERS),go mod edit -require=$(MODULE)@$(CORE_VERSION) && go mod tidy)
 	@$(MAKE) standalone
 	@git diff --quiet || git commit -am "Point adapters at $(MODULE) $(CORE_VERSION)"
 	@for m in $(ADAPTERS); do \
