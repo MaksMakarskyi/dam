@@ -15,11 +15,11 @@ TODO:
     - [x] API key
     - [x] Session (see JWTClaim key function)
     - [x] Common key (global limiter, all requests have the same key)
-- [ ] Improve the API of middleware and limiter packages to fit nicely with:
+- [x] Improve the API of middleware and limiter packages to fit nicely with:
     - [x] net/http
     - [x] Chi 
-    - [ ] Gin
-    - [ ] Echo
+    - [x] Gin
+    - [x] Echo
 - [ ] Write sophisticated documentation for the main components
 - [ ] Cover the main components with tests
 - [ ] Write README with tutorials
