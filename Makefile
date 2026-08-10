@@ -53,8 +53,6 @@ publish: version-guard check
 		|| { echo "tag $(VERSION) already exists"; exit 1; }
 	git tag -a $(VERSION) -m "Release $(VERSION)"
 	git push origin $(VERSION)
-	@GOPROXY=proxy.golang.org go list -m $(MODULE)@$(VERSION) >/dev/null \
-		|| { echo "proxy has not picked up $(VERSION) yet; retry in a moment"; exit 1; }
 
 publish-adapters: version-guard
 	@git ls-remote --exit-code --tags origin refs/tags/$(VERSION) >/dev/null \
@@ -66,5 +64,12 @@ publish-adapters: version-guard
 	@for m in $(ADAPTERS); do \
 		git tag -a $$m/$(VERSION) -m "Release $$m $(VERSION)" || exit 1; \
 		git push origin $$m/$(VERSION) || exit 1; \
-		GOPROXY=proxy.golang.org go list -m $(MODULE)/$$m@$(VERSION) >/dev/null || exit 1; \
 	done
+
+publish-pkg:
+	@for i in 1 2 3 4 5 6; do \
+		GOPROXY=proxy.golang.org go list -m $(MODULE)@$(VERSION) >/dev/null 2>&1 && exit 0; \
+		echo "waiting for the proxy to index $(MODULE)@$(VERSION) ($$i/6)"; \
+		sleep 10; \
+	done; \
+	{ echo "proxy still does not have $(MODULE)@$(VERSION)"; exit 1; }
